@@ -1,3 +1,5 @@
+// Точка входа React-приложения.
+// Подключает корневой компонент App к элементу #root в index.html.
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";

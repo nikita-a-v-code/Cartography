@@ -1,3 +1,7 @@
+// Сервис для работы с API бэкенда.
+// Обеспечивает единое место для всех запросов к бэкенду.
+// Базовый URL определяется из localStorage, переменной окружения REACT_APP_API_URL
+// или по умолчанию — http://localhost:6001.
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
@@ -50,6 +54,7 @@ class ApiService {
   }
 
   static async getAllAcccounts<T = unknown>(): Promise<T> {
+    // Получить список всех лицевых счётов
     return this.get<T>("accaunts-all");
   }
 }

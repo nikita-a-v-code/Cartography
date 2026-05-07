@@ -18,6 +18,36 @@ ADD COLUMN IF NOT EXISTS address VARCHAR(500);
 ALTER TABLE "Main".location 
 ADD COLUMN IF NOT EXISTS normalized_address VARCHAR(500);
 
+-- Добавляем серийный номер счётчика (device_id из schet_fr)
+ALTER TABLE "Main".location 
+ADD COLUMN IF NOT EXISTS serial_number VARCHAR(100);
+
+-- Добавляем модель счётчика (idname из bp_type_mp через id_type_mp)
+ALTER TABLE "Main".location 
+ADD COLUMN IF NOT EXISTS meter_model VARCHAR(255);
+
+-- Добавляем название УСД (idname из bp_usd через bp_sostav_usd)
+ALTER TABLE "Main".location 
+ADD COLUMN IF NOT EXISTS usd_name VARCHAR(255);
+
+ALTER TABLE "Main".location 
+ADD COLUMN IF NOT EXISTS usd_type VARCHAR(255);
+
+ALTER TABLE "Main".location 
+ADD COLUMN IF NOT EXISTS settlement VARCHAR(255);
+
+-- =============================================
+-- Отдельная таблица для показаний счётчиков
+-- =============================================
+CREATE TABLE IF NOT EXISTS "Main".readings (
+  source_id INTEGER PRIMARY KEY,
+  last_reading_date TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_readings_source_id
+ON "Main".readings (source_id);
+
 -- =============================================
 -- Индексы для производительности
 -- =============================================
