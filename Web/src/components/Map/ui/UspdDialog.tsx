@@ -48,7 +48,7 @@ interface Props {
   onDelete: (id: number) => void;
   onClose: () => void;
   onTypeCreated: (type: UspdType) => void; // сообщаем родителю о новом типе
-  onManageTypes: () => void;             // открыть диалог управления типами
+  onManageTypes: () => void; // открыть диалог управления типами
 }
 
 const UspdDialog: React.FC<Props> = ({
@@ -124,7 +124,9 @@ const UspdDialog: React.FC<Props> = ({
       setShowNewType(false);
       setNewTypeName("");
     } catch {
-      setTypeError("Ошибка сети");
+      setTypeError(
+        "Не удается подключиться к серверу. Убедитесь, что сервер запущен.",
+      );
     } finally {
       setCreatingType(false);
     }
@@ -169,33 +171,38 @@ const UspdDialog: React.FC<Props> = ({
           />
 
           <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-          <FormControl size="small" sx={{ flex: 1 }}>
-            <InputLabel>Тип УСПД</InputLabel>
-            <Select
-              value={showNewType ? NEW_TYPE_SENTINEL : uspdTypeId}
-              label="Тип УСПД"
-              onChange={(e) => handleSelectChange(e.target.value as number | "")}
-            >
-              <MenuItem value="">
-                <em>Не указан</em>
-              </MenuItem>
-              {uspdTypes.map((t) => (
-                <MenuItem key={t.id} value={t.id}>
-                  {t.name}
+            <FormControl size="small" sx={{ flex: 1 }}>
+              <InputLabel>Тип УСПД</InputLabel>
+              <Select
+                value={showNewType ? NEW_TYPE_SENTINEL : uspdTypeId}
+                label="Тип УСПД"
+                onChange={(e) =>
+                  handleSelectChange(e.target.value as number | "")
+                }
+              >
+                <MenuItem value="">
+                  <em>Не указан</em>
                 </MenuItem>
-              ))}
-              <Divider />
-              <MenuItem value={NEW_TYPE_SENTINEL} sx={{ color: "primary.main", fontWeight: 600 }}>
-                <AddIcon fontSize="small" sx={{ mr: 0.5 }} />
-                Создать новый тип...
-              </MenuItem>
-            </Select>
-          </FormControl>
-          <Tooltip title="Управление типами">
-            <IconButton size="small" onClick={onManageTypes} sx={{ mt: 0.5 }}>
-              <SettingsIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
+                {uspdTypes.map((t) => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.name}
+                  </MenuItem>
+                ))}
+                <Divider />
+                <MenuItem
+                  value={NEW_TYPE_SENTINEL}
+                  sx={{ color: "primary.main", fontWeight: 600 }}
+                >
+                  <AddIcon fontSize="small" sx={{ mr: 0.5 }} />
+                  Создать новый тип...
+                </MenuItem>
+              </Select>
+            </FormControl>
+            <Tooltip title="Управление типами">
+              <IconButton size="small" onClick={onManageTypes} sx={{ mt: 0.5 }}>
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
 
           {/* Инлайн-форма создания нового типа */}
@@ -204,7 +211,10 @@ const UspdDialog: React.FC<Props> = ({
               <TextField
                 label="Название нового типа"
                 value={newTypeName}
-                onChange={(e) => { setNewTypeName(e.target.value); setTypeError(""); }}
+                onChange={(e) => {
+                  setNewTypeName(e.target.value);
+                  setTypeError("");
+                }}
                 size="small"
                 fullWidth
                 autoFocus
@@ -212,7 +222,10 @@ const UspdDialog: React.FC<Props> = ({
                 helperText={typeError || undefined}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleCreateType();
-                  if (e.key === "Escape") { setShowNewType(false); setNewTypeName(""); }
+                  if (e.key === "Escape") {
+                    setShowNewType(false);
+                    setNewTypeName("");
+                  }
                 }}
                 InputProps={{
                   endAdornment: creatingType ? (
@@ -233,7 +246,11 @@ const UspdDialog: React.FC<Props> = ({
               </Button>
               <Button
                 size="small"
-                onClick={() => { setShowNewType(false); setNewTypeName(""); setTypeError(""); }}
+                onClick={() => {
+                  setShowNewType(false);
+                  setNewTypeName("");
+                  setTypeError("");
+                }}
                 sx={{ minWidth: 36, px: 1, height: 40 }}
               >
                 <CloseIcon fontSize="small" />
@@ -287,4 +304,3 @@ const UspdDialog: React.FC<Props> = ({
 };
 
 export default UspdDialog;
-

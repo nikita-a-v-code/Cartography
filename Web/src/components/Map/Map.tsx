@@ -35,10 +35,7 @@ const MapComponent: React.FC = () => {
   const [points, setPoints] = useState<PointData[]>([]);
   // Статистика геокодирования: всего / обработано / ожидает (null так как изначально данных нет)
   const [stats, setStats] = useState<StatsData | null>(null);
-  // true — идёт первичная загрузка справочника населённых пунктов
-  const [loadingLocalities, setLoadingLocalities] = useState(true);
-  // true — идёт загрузка точек с сервера
-  const [loadingPoints, setLoadingPoints] = useState(false);
+  const [loading, setLoading] = useState(false);
   // Текст последней ошибки запроса (null — ошибок нет)
   const [error, setError] = useState<string | null>(null);
   // true — режим «показать все точки» без активных фильтров
@@ -87,56 +84,60 @@ const MapComponent: React.FC = () => {
   // Диалог управления типами УСПД
   const [typesDialogOpen, setTypesDialogOpen] = useState(false);
 
-  // Загрузка справочников
-  useEffect(() => {
-    const init = async () => {
-      try {
-        //Деструктуризация массивов
-        const [localRes, statsRes] = await Promise.all([
+  // Загрузка данных
+  const loadInitialData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [localRes, statsRes, pointsRes, uspdRes, uspdTypesRes] =
+        await Promise.all([
           fetch(`${API_BASE}/api/localities`),
           fetch(`${API_BASE}/api/geocode/stats`),
-        ]);
-        if (!localRes.ok) throw new Error("Ошибка загрузки населённых пунктов");
-        setLocalities(await localRes.json());
-        if (statsRes.ok) setStats(await statsRes.json());
-        setError(null);
-      } catch (e) {
-        setError((e as Error).message);
-      } finally {
-        setLoadingLocalities(false);
-      }
-    };
-    init();
-  }, []);
-
-  // Загрузка точек и типов УСПД
-  useEffect(() => {
-    const loadUspd = async () => {
-      try {
-        const [pointsRes, typesRes] = await Promise.all([
+          fetch(`${API_BASE}/api/points`),
           fetch(`${API_BASE}/api/uspd-points`),
           fetch(`${API_BASE}/api/uspd-types`),
         ]);
-        if (pointsRes.ok) setUspdPoints(await pointsRes.json());
-        if (typesRes.ok) setUspdTypes(await typesRes.json());
-      } catch {
-        // не критично — карта работает и без УСПД
-      }
-    };
-    loadUspd();
-  }, []);
-
-  // Загрузка точек
-  const loadPoints = useCallback(async () => {
-    setLoadingPoints(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/points`);
-      if (res.ok) setPoints(await res.json());
-      setError(null);
+      if (!localRes.ok) throw new Error("Ошибка загрузки населённых пунктов");
+      if (!pointsRes.ok) throw new Error("Ошибка загрузки точек");
+      setLocalities(await localRes.json());
+      if (statsRes.ok) setStats(await statsRes.json());
+      setPoints(await pointsRes.json());
+      if (uspdRes.ok) setUspdPoints(await uspdRes.json());
+      setUspdTypes(await uspdTypesRes.json());
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setLoadingPoints(false);
+      setLoading(false);
+    }
+  }, []);
+
+  // Загрузка справочников
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  const loadUspdTypes = useCallback(async () => {
+    setLoading(true); // ← включаем глобальную загрузку (она же используется в диалоге)
+    setError(null); // ← сбрасываем старую ошибку перед новым запросом
+    try {
+      const res = await fetch(`${API_BASE}/api/uspd-types`);
+      if (!res.ok) throw new Error("Ошибка загрузки типов");
+      setUspdTypes(await res.json());
+    } catch (e) {
+      const err = e as Error;
+      if (
+        err.message === "Failed to fetch" ||
+        err.message === "NetworkError" ||
+        err.message.includes("fetch")
+      ) {
+        setError(
+          "Не удалось подключиться к серверу. Проверьте, запущен ли сервер, и повторите попытку.",
+        );
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -235,19 +236,19 @@ const MapComponent: React.FC = () => {
 
   // Показать все точки без фильтрации
   const handleShowAll = useCallback(() => {
-    if (points.length === 0) loadPoints();
+    if (points.length === 0) loadInitialData();
     setShowAll(true);
     setSelected(new Set());
     setSelectedUsdTypes(new Set());
     setSelectedUsd(new Set());
     setSelectedMeterTypes(new Set());
     setActivePanel(null);
-  }, [points.length, loadPoints]);
+  }, [points.length, loadInitialData]);
 
   // Выбрать/снять отдельный населённый пункт
   const toggleLocality = useCallback(
     (locality: string) => {
-      if (points.length === 0) loadPoints();
+      if (points.length === 0) loadInitialData();
       setShowAll(false);
       setSelected((prev) => {
         const next = new Set(prev);
@@ -255,20 +256,20 @@ const MapComponent: React.FC = () => {
         return next;
       });
     },
-    [points.length, loadPoints],
+    [points.length, loadInitialData],
   );
 
   // Выбрать все населённые пункты
   const selectAllLocalities = useCallback(() => {
-    if (points.length === 0) loadPoints();
+    if (points.length === 0) loadInitialData();
     setShowAll(false);
     setSelected(new Set(localities.map((l) => l.locality)));
-  }, [localities, points.length, loadPoints]);
+  }, [localities, points.length, loadInitialData]);
 
   // Выбрать/снять тип УСПД (при смене типа сбрасываются конкретные УСПД)
   const toggleUsdType = useCallback(
     (type: string) => {
-      if (points.length === 0) loadPoints();
+      if (points.length === 0) loadInitialData();
       setSelectedUsdTypes((prev) => {
         const next = new Set(prev);
         next.has(type) ? next.delete(type) : next.add(type);
@@ -276,7 +277,7 @@ const MapComponent: React.FC = () => {
       });
       setSelectedUsd(new Set());
     },
-    [points.length, loadPoints],
+    [points.length, loadInitialData],
   );
 
   // Выбрать/снять конкретное наименование УСПД
@@ -291,14 +292,14 @@ const MapComponent: React.FC = () => {
   // Выбрать/снять модель счётчика
   const onToggleMeterType = useCallback(
     (type: string) => {
-      if (points.length === 0) loadPoints();
+      if (points.length === 0) loadInitialData();
       setSelectedMeterTypes((prev) => {
         const next = new Set(prev);
         next.has(type) ? next.delete(type) : next.add(type);
         return next;
       });
     },
-    [points.length, loadPoints],
+    [points.length, loadInitialData],
   );
 
   // Сбросить сразу все фильтры
@@ -314,7 +315,12 @@ const MapComponent: React.FC = () => {
 
   // Запустить фоновое обновление показаний и подписаться на SSE-прогресс
   const startReadingsUpdate = useCallback(() => {
-    fetch(`${API_BASE}/api/readings/update`, { method: "POST" });
+    setError(null);
+    fetch(`${API_BASE}/api/readings/update`, { method: "POST" }).catch(
+      (err) => {
+        setError((err as Error).message);
+      },
+    );
     const eventSource = new EventSource(`${API_BASE}/api/readings/progress`);
     eventSource.onmessage = (event) => {
       const data: ReadingsProgress = JSON.parse(event.data);
@@ -324,7 +330,10 @@ const MapComponent: React.FC = () => {
         setTimeout(() => setReadingsProgress(null), 3000);
       }
     };
-    eventSource.onerror = () => eventSource.close();
+    eventSource.onerror = () => {
+      eventSource.close();
+      setError("Ошибка подключения к серверу обновления показаний");
+    };
   }, []);
 
   // --- Обработчики УСПД ---
@@ -372,6 +381,11 @@ const MapComponent: React.FC = () => {
                 p.id === updated.id ? { ...updated, type_name: typeName } : p,
               ),
             );
+            setError(null);
+          } else {
+            const errData = await res.json();
+            setError(errData.error || "Ошибка сохранения точки");
+            return;
           }
         } else {
           const res = await fetch(`${API_BASE}/api/uspd-points`, {
@@ -388,10 +402,16 @@ const MapComponent: React.FC = () => {
               { ...created, type_name: typeName },
               ...prev,
             ]);
+            setError(null);
+          } else {
+            const errData = await res.json();
+            setError(errData.error || "Ошибка создания точки");
+            return;
           }
         }
-      } catch {
-        // ошибка не критична, данные можно перезагрузить
+      } catch (err) {
+        setError((err as Error).message);
+        return;
       }
       setUspdDialogState(null);
     },
@@ -401,10 +421,20 @@ const MapComponent: React.FC = () => {
   // Удалить точку УСПД
   const handleUspdDelete = useCallback(async (id: number) => {
     try {
-      await fetch(`${API_BASE}/api/uspd-points/${id}`, { method: "DELETE" });
-      setUspdPoints((prev) => prev.filter((p) => p.id !== id));
-    } catch {
-      // не критично
+      const res = await fetch(`${API_BASE}/api/uspd-points/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setUspdPoints((prev) => prev.filter((p) => p.id !== id));
+        setError(null);
+      } else {
+        const errData = await res.json();
+        setError(errData.error || "Ошибка удаления точки");
+        return;
+      }
+    } catch (err) {
+      setError((err as Error).message);
+      return;
     }
     setUspdDialogState(null);
   }, []);
@@ -412,7 +442,7 @@ const MapComponent: React.FC = () => {
   // Открыть/закрыть панель фильтра (при первом открытии загружает точки)
   const togglePanel = (panel: ActivePanel) => {
     if (panel && points.length === 0) {
-      loadPoints();
+      loadInitialData();
     }
     setActivePanel((prev) => (prev === panel ? null : panel));
   };
@@ -422,7 +452,7 @@ const MapComponent: React.FC = () => {
       <Toolbar
         stats={stats}
         showAll={showAll}
-        loadingPoints={loadingPoints}
+        loadingPoints={loading}
         activePanel={activePanel}
         selectedCount={selected.size}
         selectedUsdTypesCount={selectedUsdTypes.size}
@@ -441,10 +471,11 @@ const MapComponent: React.FC = () => {
       />
 
       <StatusIndicators
-        loadingPoints={loadingPoints}
+        loadingPoints={loading}
         error={error}
         readingsProgress={readingsProgress}
         onClearError={() => setError(null)}
+        onRetry={loadInitialData}
       />
 
       <FilterDropdown
@@ -453,7 +484,7 @@ const MapComponent: React.FC = () => {
         localities={localities}
         selected={selected}
         search={search}
-        loadingLocalities={loadingLocalities}
+        loadingLocalities={loading}
         onToggleLocality={toggleLocality}
         onSelectAllLocalities={selectAllLocalities}
         onClearLocalities={() => setSelected(new Set())}
@@ -479,7 +510,7 @@ const MapComponent: React.FC = () => {
         onClearMeterFilters={() => setSelectedMeterTypes(new Set())}
         selectedStatuses={selectedStatuses}
         onToggleStatus={(status) => {
-          if (points.length === 0) loadPoints();
+          if (points.length === 0) loadInitialData();
           setSelectedStatuses((prev) => {
             const next = new Set(prev);
             next.has(status) ? next.delete(status) : next.add(status);
@@ -529,6 +560,9 @@ const MapComponent: React.FC = () => {
       <UspdTypesDialog
         open={typesDialogOpen}
         uspdTypes={uspdTypes}
+        loading={loading}
+        error={error}
+        onLoad={loadUspdTypes}
         onTypeUpdated={(updated) =>
           setUspdTypes((prev) =>
             prev

@@ -8,7 +8,8 @@ import L from "leaflet";
 import { PointData, ReadingStatus } from "../types";
 
 /** Базовый URL бэкенд-сервера */
-export const API_BASE = "http://localhost:6002";
+export const API_BASE =
+  process.env.REACT_APP_API_URL || "http://localhost:6002";
 
 /** Координаты центра карты при первоначальной загрузке (г. Киров) */
 export const DEFAULT_CENTER: L.LatLngExpression = [58.6036, 49.6681];

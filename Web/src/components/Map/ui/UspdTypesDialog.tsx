@@ -1,6 +1,6 @@
 // Диалог управления справочником типов УСПД:
 // просмотр, переименование, удаление.
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -17,6 +17,7 @@ import {
   Typography,
   CircularProgress,
   Box,
+  Alert,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -28,17 +29,23 @@ import { API_BASE } from "../utils/mapUtils";
 interface Props {
   open: boolean;
   uspdTypes: UspdType[];
+  loading: boolean;
+  error: string | null;
   onClose: () => void;
   onTypeUpdated: (type: UspdType) => void;
   onTypeDeleted: (id: number) => void;
+  onLoad: () => Promise<void>;
 }
 
 const UspdTypesDialog: React.FC<Props> = ({
   open,
   uspdTypes,
+  loading,
+  error,
   onClose,
   onTypeUpdated,
   onTypeDeleted,
+  onLoad,
 }) => {
   // id типа, который сейчас редактируется (null = нет)
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -46,24 +53,30 @@ const UspdTypesDialog: React.FC<Props> = ({
   const [editDesc, setEditDesc] = useState("");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      onLoad();
+    }
+  }, [open, onLoad]);
 
   const startEdit = (type: UspdType) => {
     setEditingId(type.id);
     setEditName(type.name);
     setEditDesc(type.description ?? "");
-    setError("");
+    setFormError("");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setError("");
+    setFormError("");
   };
 
   const handleSaveEdit = async () => {
     if (!editName.trim() || editingId == null) return;
     setSaving(true);
-    setError("");
+    setFormError("");
     try {
       const res = await fetch(`${API_BASE}/api/uspd-types/${editingId}`, {
         method: "PUT",
@@ -75,14 +88,16 @@ const UspdTypesDialog: React.FC<Props> = ({
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error ?? "Ошибка сохранения");
+        setFormError(data.error ?? "Ошибка сохранения");
         return;
       }
       const updated: UspdType = await res.json();
       onTypeUpdated(updated);
       setEditingId(null);
     } catch {
-      setError("Ошибка сети");
+      setFormError(
+        "Не удается подключиться к серверу.Убедитесь, что сервер запущен.",
+      );
     } finally {
       setSaving(false);
     }
@@ -97,13 +112,15 @@ const UspdTypesDialog: React.FC<Props> = ({
       });
       if (!res.ok && res.status !== 404) {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Ошибка удаления");
+        setFormError(data.error ?? "Ошибка удаления");
         return;
       }
       onTypeDeleted(id);
       if (editingId === id) setEditingId(null);
     } catch {
-      setError("Ошибка сети");
+      setFormError(
+        "Не удается подключиться к серверу. Убедитесь, что сервер запущен.",
+      );
     } finally {
       setDeletingId(null);
     }
@@ -114,11 +131,25 @@ const UspdTypesDialog: React.FC<Props> = ({
       <DialogTitle>Управление типами УСПД</DialogTitle>
 
       <DialogContent sx={{ pt: 0 }}>
-        {uspdTypes.length === 0 ? (
+        {loading && (
+          <Box display="flex" justifyContent="center" py={4}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {!loading && error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {!loading && !error && uspdTypes.length === 0 && (
           <Typography color="text.secondary" sx={{ py: 2 }}>
             Нет ни одного типа
           </Typography>
-        ) : (
+        )}
+
+        {!loading && !error && uspdTypes.length > 0 && (
           <List dense disablePadding>
             {uspdTypes.map((type) =>
               editingId === type.id ? (
@@ -136,13 +167,13 @@ const UspdTypesDialog: React.FC<Props> = ({
                       value={editName}
                       onChange={(e) => {
                         setEditName(e.target.value);
-                        setError("");
+                        setFormError("");
                       }}
                       size="small"
                       autoFocus
                       sx={{ flex: "1 1 140px" }}
-                      error={!!error}
-                      helperText={error || undefined}
+                      error={!!formError}
+                      helperText={formError || undefined}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSaveEdit();
                         if (e.key === "Escape") cancelEdit();

@@ -24,6 +24,7 @@ dotenv.config();
 
 // Пулы подключений к двум базам данных (детали конфигурации в config/database.ts)
 import { sourcePool, coordsPool } from "./config/database";
+import path from "path";
 
 // Функции и типы для работы с показаниями счётчиков
 import {
@@ -55,6 +56,11 @@ app.use(cors());
 // express.json() — автоматически парсит JSON-тело входящих запросов (POST/PUT)
 // После этого тело доступно через req.body
 app.use(express.json());
+
+app.use(express.static(path.join(__dirname, "../../frontend/build")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../../frontend/build", "index.html"));
+});
 
 // ─── Интерфейсы строк из PostgreSQL ──────────────────────────────────────────
 
