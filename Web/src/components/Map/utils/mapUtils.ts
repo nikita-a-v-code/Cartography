@@ -14,11 +14,11 @@ export const API_BASE =
 /** Координаты центра карты при первоначальной загрузке (г. Киров) */
 export const DEFAULT_CENTER: L.LatLngExpression = [58.6036, 49.6681];
 /** Начальный масштаб карты */
-export const DEFAULT_ZOOM = 8;
+export const DEFAULT_ZOOM = 6;
 /** Географические ограничения для панорамирования (Кировская область) */
 export const KIROV_BOUNDS: L.LatLngBoundsExpression = [
-  [56.3, 46.8],
-  [61.1, 53.2],
+  [55.8, 46.8],
+  [61.5, 54.5],
 ];
 
 // Исправление проблемы с иконками маркеров в React

@@ -17,6 +17,7 @@ import { sourcePool, coordsPool } from "../config/database";
 import { geocode } from "../services/geocoder";
 import { normalizeAddress } from "../services/addressNormalizer";
 import dotenv from "dotenv";
+import { EventEmitter } from "events";
 
 dotenv.config();
 
@@ -49,7 +50,28 @@ interface CountRow {
   count: string;
 }
 
+// Глобальный EventEmitter — через него функция geocodeAddresses() отправляет
+// события прогресса SSE-событиям слушающим в index.ts (/api/readings/progress)
+export const geocodeProgress = new EventEmitter();
+
+let isRunning = false;
+
 async function geocodeAddresses(): Promise<void> {
+  if (isRunning) {
+    console.log("Геокодирование уже выполняется, пропускаем");
+    geocodeProgress.emit("progress", {
+      status: "error",
+      processed: 0,
+      total: 0,
+      success: 0,
+      failed: 0,
+      message: "Геокодирование уже выполняется",
+    });
+    return;
+  }
+
+  isRunning = true;
+
   console.log("🚀 Запуск геокодирования адресов...\n");
   console.log("📖 SOURCE DB: исходные данные (enforce_dba.schet_fr)");
   console.log("💾 COORDS DB: сохранение координат (Main.location)\n");
@@ -86,6 +108,7 @@ async function geocodeAddresses(): Promise<void> {
       LEFT JOIN "enforce_dba".bp_usd_type but ON bu.id_type = but.id
       WHERE sf.device_id IS NOT NULL
         AND sf.device_id != ''
+        AND sf.object_location IS NOT NULL
       ORDER BY sf.id
     `);
 
@@ -139,6 +162,15 @@ async function geocodeAddresses(): Promise<void> {
 
     if (addresses.length === 0) {
       console.log("✅ Все адреса уже геокодированы!");
+      geocodeProgress.emit("progress", {
+        status: "done",
+        processed: 0,
+        total: 0,
+        success: 0,
+        failed: 0,
+        message: "Все адреса уже геокодированы",
+      });
+      isRunning = false;
       return;
     }
 
@@ -149,8 +181,18 @@ async function geocodeAddresses(): Promise<void> {
       console.log(`🔄 Повторных попыток (ранее не найдено): ${retryCount}`);
     console.log(`📊 Всего в этом запуске: ${addresses.length}\n`);
 
+    const total = addresses.length;
+    let processed = 0;
     let success = 0;
     let failed = 0;
+
+    geocodeProgress.emit("progress", {
+      status: "running",
+      processed: 0,
+      total,
+      success: 0,
+      failed: 0,
+    });
 
     for (let i = 0; i < addresses.length; i++) {
       // Деструктуризируем и выводим отдельные переменные
@@ -238,6 +280,15 @@ async function geocodeAddresses(): Promise<void> {
         failed++;
       }
 
+      processed = i + 1;
+      geocodeProgress.emit("progress", {
+        status: "running",
+        processed,
+        total,
+        success,
+        failed,
+      });
+
       // ── Шаг 7: Пауза между запросами ─────────────────────────────────────────
       // Nominatim (OpenStreetMap) требует не более 1 запроса в секунду.
       // Пропускаем паузу только для последнего элемента.
@@ -250,6 +301,15 @@ async function geocodeAddresses(): Promise<void> {
     console.log(`✅ Успешно: ${success}`);
     console.log(`❌ Не найдено: ${failed}`);
     console.log(`📊 Всего обработано: ${addresses.length}`);
+
+    geocodeProgress.emit("progress", {
+      status: "done",
+      processed,
+      total,
+      success,
+      failed,
+      message: "Геокодирование завершено",
+    });
 
     // Проверяем, остались ли ещё записи
     try {
@@ -278,11 +338,15 @@ async function geocodeAddresses(): Promise<void> {
     const err = error as Error;
     console.error("❌ Ошибка:", err.message);
     console.error(err.stack);
-  } finally {
-    await sourcePool.end();
-    await coordsPool.end();
+    geocodeProgress.emit("progress", {
+      status: "error",
+      processed: 0,
+      total: 0,
+      success: 0,
+      failed: 0,
+      message: err.message,
+    });
   }
 }
 
-// Запуск
-geocodeAddresses();
+export { geocodeAddresses };

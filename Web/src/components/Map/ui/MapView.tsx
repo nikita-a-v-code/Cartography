@@ -4,7 +4,13 @@
 // Цвет маркера зависит от статуса показаний (зелёный/красный/серый).
 // Также отображает маркеры УСПД (ручное размещение) и обрабатывает клик в режиме добавления.
 import React from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMapEvents,
+} from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import { PointData, UspdPoint } from "../types";
 import {
@@ -50,7 +56,7 @@ const MapView: React.FC<Props> = ({
   <MapContainer
     center={DEFAULT_CENTER}
     zoom={DEFAULT_ZOOM}
-    className={`map-container${addingUspdMode ? " placement-mode" : ""}`}
+    className={`leaflet-map${addingUspdMode ? " placement-mode" : ""}`}
     maxBounds={KIROV_BOUNDS}
     maxBoundsViscosity={1.0}
     minZoom={7}

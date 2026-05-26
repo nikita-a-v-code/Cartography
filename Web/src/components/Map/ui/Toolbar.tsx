@@ -22,8 +22,9 @@ import MapIcon from "@mui/icons-material/Map";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
-
-import { StatsData, ReadingsProgress } from "../types";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import { StatsData, ReadingsProgress, GeocodingProgress } from "../types";
+import UserMenu from "./UserMenu";
 
 export type ActivePanel = "locality" | "uspd" | "meter" | "status" | null;
 
@@ -40,12 +41,17 @@ interface ToolbarProps {
   totalPointsCount: number;
   hasAnyFilter: boolean;
   readingsProgress: ReadingsProgress | null;
+  geocodingProgress: GeocodingProgress | null;
   addingUspdMode: boolean;
   onShowAll: () => void;
   onTogglePanel: (panel: ActivePanel) => void;
   onClearAllFilters: () => void;
   onStartReadingsUpdate: () => void;
+  onStartGeocode: () => void;
   onToggleAddUspdMode: () => void;
+  onOpenHelp: () => void;
+  canUpdateReadings: boolean;
+  canAdminAccess: boolean;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -61,12 +67,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
   totalPointsCount,
   hasAnyFilter,
   readingsProgress,
+  geocodingProgress,
   addingUspdMode,
   onShowAll,
   onTogglePanel,
   onClearAllFilters,
   onStartReadingsUpdate,
+  onStartGeocode,
   onToggleAddUspdMode,
+  onOpenHelp,
+  canUpdateReadings,
+  canAdminAccess,
 }) => (
   <Box className="top-toolbar">
     <Box className="toolbar-left">
@@ -195,20 +206,29 @@ const Toolbar: React.FC<ToolbarProps> = ({
     </Box>
 
     <Box className="toolbar-right">
-      <Tooltip title={addingUspdMode ? "Отменить размещение" : "Разместить точку УСПД на карте"}>
-        <Button
-          variant={addingUspdMode ? "contained" : "outlined"}
-          color="secondary"
-          size="small"
-          startIcon={<AddLocationAltIcon />}
-          onClick={onToggleAddUspdMode}
-          sx={{ textTransform: "none" }}
+      {canUpdateReadings && (
+        <Tooltip
+          title={
+            addingUspdMode
+              ? "Отменить размещение"
+              : "Разместить точку УСПД на карте"
+          }
         >
-          {addingUspdMode ? "Нажмите на карту..." : "Добавить УСПД"}
-        </Button>
-      </Tooltip>
+          <Button
+            variant={addingUspdMode ? "contained" : "outlined"}
+            color="secondary"
+            size="small"
+            startIcon={<AddLocationAltIcon />}
+            onClick={onToggleAddUspdMode}
+            sx={{ textTransform: "none" }}
+          >
+            {addingUspdMode ? "Нажмите на карту..." : "Добавить УСПД"}
+          </Button>
+        </Tooltip>
+      )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
       <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>
         На карте:{" "}
         <Box component="span" fontWeight={700} color="primary.main">
@@ -221,21 +241,53 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </Box>
         )}
       </Typography>
+      {canUpdateReadings && (
+        <Tooltip title={geocodingProgress?.status === "running" ? "Дождитесь завершения геокодирования" : "Обновить показания"}>
+          <span>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={onStartReadingsUpdate}
+              disabled={readingsProgress?.status === "running" || geocodingProgress?.status === "running"}
+              sx={{ textTransform: "none" }}
+            >
+              Обновить статус показаний
+            </Button>
+          </span>
+        </Tooltip>
+      )}
 
-      <Tooltip title="Обновить показания">
-        <span>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<RefreshIcon />}
-            onClick={onStartReadingsUpdate}
-            disabled={readingsProgress?.status === "running"}
-            sx={{ textTransform: "none" }}
-          >
-            Обновить статус показаний
-          </Button>
-        </span>
-      </Tooltip>
+      {canAdminAccess && (
+        <Tooltip title={readingsProgress?.status === "running" ? "Дождитесь завершения обновления показаний" : "Запустить геокодирование"}>
+          <span>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={onStartGeocode}
+              disabled={geocodingProgress?.status === "running" || readingsProgress?.status === "running"}
+              sx={{ textTransform: "none" }}
+            >
+              Запустить геокодирование
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+
+      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+      {canAdminAccess && (
+        <Tooltip title="Справка">
+          <IconButton onClick={onOpenHelp} size="small">
+            <HelpOutlineIcon />
+          </IconButton>
+        </Tooltip>
+      )}
+
+      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+      <UserMenu />
     </Box>
   </Box>
 );

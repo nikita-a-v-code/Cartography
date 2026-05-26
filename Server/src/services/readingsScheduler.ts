@@ -10,17 +10,17 @@
  * Прогресс операции транслируется через EventEmitter (readingsProgress)
  * и доставляется клиенту через SSE-маршрут /api/readings/progress.
  *
- * Расписание по умолчанию: 1 раз в 3 дня в 02:00
+ * Расписание по умолчанию: каждые 3 дня в 02:00 ночи
  */
 
 import cron from "node-cron";
 import { sourcePool, coordsPool } from "../config/database";
 import { EventEmitter } from "events";
+import { writeLog, getReadingsLogFileName } from "../utils/logger";
 
-// Обрабатываем ID порциями (батчами), чтобы:
-//   а) не создавать слишком большой SQL-запрос (PostgreSQL лимитирует размер списка в IN/ANY)
-//   б) сохранять разумный объём памяти в одном запросе
-const BATCH_SIZE = 1000;
+// Настройки из переменных окружения (с дефолтами)
+const BATCH_SIZE = parseInt(process.env.READINGS_BATCH_SIZE || "1000", 10);
+const READINGS_CRON = process.env.READINGS_CRON || "0 2 */3 * *";
 
 // Глобальный EventEmitter — через него функция updateReadings() отправляет
 // события прогресса SSE-событиям слушающим в index.ts (/api/readings/progress)
@@ -46,6 +46,9 @@ interface LocationRow {
 
 // Флаг защиты от параллельного запуска: если уже идёт обновление — пропускаем
 let isRunning = false;
+// Флаги для контроля выполнения
+let isPaused = false;
+let shouldCancel = false;
 
 async function updateReadings(): Promise<void> {
   if (isRunning) {
@@ -58,7 +61,8 @@ async function updateReadings(): Promise<void> {
   console.log(
     `[${new Date().toISOString()}] 📊 Обновление показаний счётчиков...`,
   );
-
+  const logFileName = getReadingsLogFileName();
+  await writeLog(logFileName, `=== Начало обновления показаний ===`);
   try {
     // ── Шаг 1: Загружаем все source_id из COORDS DB ────────────────────────────
     // Мы обновляем показания только для тех, у кого есть координаты —
@@ -94,6 +98,25 @@ async function updateReadings(): Promise<void> {
 
     // ── Шаг 2: Обрабатываем ID порциями (batch) чтобы не загружать весь список в SQL ──
     for (let offset = 0; offset < sourceIds.length; offset += BATCH_SIZE) {
+      // Проверяем флаги отмены и паузы
+      if (shouldCancel) {
+        console.log("   ⏹️ Обновление показаний отменено пользователем");
+        readingsProgress.emit("progress", {
+          status: "done",
+          processed,
+          total,
+          withReadings,
+          message: "Отменено",
+        } as ReadingsProgressData);
+        return;
+      }
+
+      // Пауза — ждём возобновления
+      while (isPaused) {
+        console.log("   ⏸️ Обновление показаний на паузе");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
       const batchIds = sourceIds.slice(offset, offset + BATCH_SIZE);
 
       // ── Шаг 3: Запрашиваем дату последнего показания в SOURCE DB ──────────────
@@ -156,7 +179,10 @@ async function updateReadings(): Promise<void> {
         withReadings,
       } as ReadingsProgressData);
     }
-
+    await writeLog(
+      logFileName,
+      `Обработано записей: ${total}, из них с показаниями: ${withReadings}`,
+    );
     console.log(
       `   ✅ Обновлено: ${processed}/${total}, с показаниями: ${withReadings}`,
     );
@@ -171,6 +197,7 @@ async function updateReadings(): Promise<void> {
   } catch (error) {
     const err = error as Error;
     console.error("   ❌ Ошибка обновления показаний:", err.message);
+    await writeLog(logFileName, `!!! Ошибка: ${err.message}`);
     readingsProgress.emit("progress", {
       status: "error",
       processed: 0,
@@ -180,7 +207,10 @@ async function updateReadings(): Promise<void> {
     } as ReadingsProgressData);
   } finally {
     isRunning = false;
+    isPaused = false;
+    shouldCancel = false;
   }
+  await writeLog(logFileName, `=== Успешно завершено ===`);
 }
 
 /**
@@ -188,7 +218,7 @@ async function updateReadings(): Promise<void> {
  * По умолчанию: каждые 3 дня в 02:00
  */
 export function startReadingsScheduler(
-  cronExpression: string = "0 2 */3 * *",
+  cronExpression: string = READINGS_CRON,
 ): void {
   console.log("📅 Планировщик показаний запущен");
   console.log(`   Расписание: ${cronExpression}`);
@@ -198,6 +228,25 @@ export function startReadingsScheduler(
 
   // Планируем регулярный запуск
   cron.schedule(cronExpression, updateReadings);
+}
+
+/** Пауза выполнения обновления показаний */
+export function pauseReadings(): void {
+  isPaused = true;
+  console.log("⏸️ Обновление показаний приостановлено");
+}
+
+/** Возобновление выполнения обновления показаний */
+export function resumeReadings(): void {
+  isPaused = false;
+  console.log("▶️ Обновление показаний возобновлено");
+}
+
+/** Отмена выполнения обновления показаний */
+export function cancelReadings(): void {
+  shouldCancel = true;
+  isPaused = false;
+  console.log("⏹️ Обновление показаний отменено");
 }
 
 export { updateReadings, isRunning };

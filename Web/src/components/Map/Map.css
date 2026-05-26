@@ -3,14 +3,29 @@
   height: 100%;
   width: 100%;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-container {
-  position: absolute;
-  top: 60px;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Стили для MapContainer из react-leaflet */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-map {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-map.placement-mode {
+  cursor: crosshair;
 }
 
 /* ===== Иконка счётчика ===== */
@@ -369,10 +384,10 @@
 }
 
 /* ===== Режим размещения УСПД ===== */
-.map-container.placement-mode {
+.leaflet-map.placement-mode {
   cursor: crosshair !important;
 }
 
-.map-container.placement-mode .leaflet-interactive {
+.leaflet-map.placement-mode .leaflet-interactive {
   cursor: crosshair !important;
 }

@@ -9,6 +9,7 @@ import {
   LocalityData,
   StatsData,
   ReadingsProgress,
+  GeocodingProgress,
   ReadingStatus,
   UspdPoint,
   UspdType,
@@ -18,8 +19,12 @@ import Toolbar, { ActivePanel } from "./ui/Toolbar";
 import FilterDropdown from "./utils/FilterDropdown";
 import StatusIndicators from "./ui/StatusIndicators";
 import MapView from "./ui/MapView";
+import ReadingsPanel from "./ui/ReadingsPanel";
 import UspdDialog from "./ui/UspdDialog";
 import UspdTypesDialog from "./ui/UspdTypesDialog";
+import HelpDialog from "./ui/HelpDialog";
+import { useAuth } from "../../context/AuthContext";
+import GeocodingPanel from "./ui/GeocodingPanel";
 
 const MapComponent: React.FC = () => {
   // --- Состояние населённых пунктов и поиска ---
@@ -72,6 +77,11 @@ const MapComponent: React.FC = () => {
   const [readingsProgress, setReadingsProgress] =
     useState<ReadingsProgress | null>(null);
 
+  // --- Прогресс фонового обновления показаний ---
+  // Данные SSE-прогресса: null — обновление не запущено
+  const [geocodingProgress, setGeocodingProgress] =
+    useState<GeocodingProgress | null>(null);
+
   // --- Состояние УСПД ---
   const [uspdPoints, setUspdPoints] = useState<UspdPoint[]>([]);
   const [uspdTypes, setUspdTypes] = useState<UspdType[]>([]);
@@ -83,6 +93,12 @@ const MapComponent: React.FC = () => {
   >(null);
   // Диалог управления типами УСПД
   const [typesDialogOpen, setTypesDialogOpen] = useState(false);
+
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const { isAdmin, isOperator } = useAuth();
+  const canUpdateReadings = isAdmin() || isOperator();
+  const canAdminAccess = isAdmin();
 
   // Загрузка данных
   const loadInitialData = useCallback(async () => {
@@ -336,6 +352,27 @@ const MapComponent: React.FC = () => {
     };
   }, []);
 
+  // Запустить фоновое геокодирование и подписаться на SSE-прогресс
+  const startGeocode = useCallback(() => {
+    setError(null);
+    fetch(`${API_BASE}/api/geocode/update`, { method: "POST" }).catch((err) => {
+      setError((err as Error).message);
+    });
+    const eventSource = new EventSource(`${API_BASE}/api/geocode/progress`);
+    eventSource.onmessage = (event) => {
+      const data: GeocodingProgress = JSON.parse(event.data);
+      setGeocodingProgress(data);
+      if (data.status === "done" || data.status === "error") {
+        eventSource.close();
+        setTimeout(() => setGeocodingProgress(null), 3000);
+      }
+    };
+    eventSource.onerror = () => {
+      eventSource.close();
+      setError("Ошибка подключения к серверу геокодирования");
+    };
+  }, []);
+
   // --- Обработчики УСПД ---
 
   // Клик на карту в режиме размещения — открываем диалог создания
@@ -462,12 +499,17 @@ const MapComponent: React.FC = () => {
         totalPointsCount={points.length}
         hasAnyFilter={hasAnyFilter}
         readingsProgress={readingsProgress}
+        geocodingProgress={geocodingProgress}
         addingUspdMode={addingUspdMode}
         onShowAll={handleShowAll}
         onTogglePanel={togglePanel}
         onClearAllFilters={clearAllFilters}
         onStartReadingsUpdate={startReadingsUpdate}
+        onStartGeocode={startGeocode}
         onToggleAddUspdMode={() => setAddingUspdMode((v) => !v)}
+        onOpenHelp={() => setHelpOpen(true)}
+        canUpdateReadings={canUpdateReadings}
+        canAdminAccess={canAdminAccess}
       />
 
       <StatusIndicators
@@ -520,13 +562,19 @@ const MapComponent: React.FC = () => {
         onClearStatuses={() => setSelectedStatuses(new Set())}
       />
 
-      <MapView
-        points={displayedPoints}
-        uspdPoints={uspdPoints}
-        addingUspdMode={addingUspdMode}
-        onMapClick={handleMapClick}
-        onUspdMarkerClick={handleUspdMarkerClick}
-      />
+      <div className="map-container">
+        <MapView
+          points={displayedPoints}
+          uspdPoints={uspdPoints}
+          addingUspdMode={addingUspdMode}
+          onMapClick={handleMapClick}
+          onUspdMarkerClick={handleUspdMarkerClick}
+        />
+      </div>
+
+      {canAdminAccess && <ReadingsPanel progress={readingsProgress} />}
+
+      {canAdminAccess && <GeocodingPanel progress={geocodingProgress} />}
 
       <UspdDialog
         open={uspdDialogState !== null}
@@ -575,6 +623,7 @@ const MapComponent: React.FC = () => {
         }
         onClose={() => setTypesDialogOpen(false)}
       />
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 };

@@ -43,6 +43,16 @@ export interface ReadingsProgress {
   message?: string;
 }
 
+/** Прогресс фонового геокодирования, приходящий через SSE (Server-Sent Events) */
+export interface GeocodingProgress {
+  status: "running" | "done" | "error";
+  processed: number;
+  total: number;
+  success: number; // количество успешно обработанных адресов
+  failed: number; // количество неудачных
+  message?: string; // опциональное сообщение
+}
+
 /** Тип УСПД из справочника */
 export interface UspdType {
   id: number;

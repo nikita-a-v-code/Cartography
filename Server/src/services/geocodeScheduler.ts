@@ -1,27 +1,34 @@
 /**
  * geocodeScheduler.ts — Фоновый планировщик геокодирования
  *
- * Автоматически геокодирует новые адреса без участия пользователя.
+ * Автоматически геокодирует новые адреса и повторяет неудачные попытки.
  * Запускается при старте сервера + далее по расписанию (cron).
  *
  * Отличие от scripts/geocode.ts:
- *   - geocodeScheduler работает в фоне, небольшими порциями (BATCH_SIZE=50)
- *   - scripts/geocode.ts запускается вручную для массовой обработки (BATCH_SIZE=5000)
+ *   - geocodeScheduler работает в фоне, небольшими порциями (BATCH_SIZE=300)
  *
- * Расписание по умолчанию: 1 раз в неделю
+ * Логика повторных попыток:
+ *   - Адреса без координат проверяются повторно через RETRY_AFTER_DAYS дней
+ *   - Дата последней попытки хранится в поле last_geocode_request
+ *   - Новые адреса (отсутствующие в location) геокодируются сразу
+ *
+ * Расписание по умолчанию: каждые 3 дня в 03:00 ночи
  */
 
 import cron from "node-cron";
 import { sourcePool, coordsPool } from "../config/database";
 import { geocode } from "./geocoder";
+import { writeLog, getGeocodeLogFileName } from '../utils/logger'
+
+// Настройки из переменных окружения (с дефолтами)
+const BATCH_SIZE = parseInt(process.env.GEOCODER_BATCH_SIZE || "300", 10);
+const RETRY_AFTER_DAYS = parseInt(process.env.GEOCODER_RETRY_DAYS || "30", 10);
+const DEFAULT_CRON = process.env.GEOCODER_CRON || "0 3 */3 * *";
 
 // Задержка между запросами к геокодеру.
 // Nominatim требует минимум 1000 мс по Terms of Use,
 // берём 1100 мс с запасом.
 const DELAY_MS = 1100;
-
-// Небольшой размер батча для фоновой задачи — не нагружаем сервер
-const BATCH_SIZE = 50;
 
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -42,6 +49,8 @@ interface ExistingRow {
   meter_model: string | null;
   usd_name: string | null;
   usd_type: string | null;
+  coordinates: any; // или string | null
+  last_geocode_request: Date | null;
 }
 
 interface ProcessedRow {
@@ -49,8 +58,10 @@ interface ProcessedRow {
 }
 
 async function processNewAddresses(): Promise<void> {
+  const logFileName = getGeocodeLogFileName();
+  await writeLog(logFileName, `=== Запуск геокодирования ===`);
   console.log(`[${new Date().toISOString()}] 🔄 Проверка новых адресов...`);
-
+ 
   try {
     // ── Шаг 1: Загружаем все адреса из SOURCE DB ──────────────────────────
     const sourceResult = await sourcePool.query<SourceRow>(`
@@ -65,6 +76,7 @@ async function processNewAddresses(): Promise<void> {
       LEFT JOIN "enforce_dba".bp_usd_type but ON bu.id_type = but.id
       WHERE sf.device_id IS NOT NULL
         AND sf.device_id != ''
+        AND sf.object_location IS NOT NULL
       ORDER BY sf.id
     `);
     const sourceRows = sourceResult.rows;
@@ -93,7 +105,8 @@ async function processNewAddresses(): Promise<void> {
 
     // ── Шаг 3: Загружаем существующие записи из COORDS DB ─────────────────
     const existingResult = await coordsPool.query<ExistingRow>(`
-      SELECT source_id, address, serial_number, meter_model, usd_name, usd_type
+      SELECT source_id, address, serial_number, meter_model, usd_name, usd_type,
+         coordinates, last_geocode_request
       FROM "Main".location
     `);
     const existingMap = new Map(
@@ -151,34 +164,70 @@ async function processNewAddresses(): Promise<void> {
         `   ✏️  Обновлены метаданные (без перегеокодирования): ${updatedMeta}`,
       );
 
-    // ── Шаг 5: Определяем что нужно геокодировать ─────────────────────────
-    // Берём source_id без координат (новые + со сброшенным адресом)
-    const processedResult = await coordsPool.query<ProcessedRow>(`
-      SELECT source_id FROM "Main".location WHERE coordinates IS NOT NULL
-    `);
-    const processedIds = new Set(processedResult.rows.map((r) => r.source_id));
+    // ── Шаг 5: Определяем, какие адреса нужно геокодировать ─────────────────
+    // Включаем:
+    // - новые записи (отсутствуют в location)
+    // - существующие, у которых coordinates = NULL, и с момента последней попытки прошло RETRY_AFTER_DAYS дней
 
-    const toGeocode = sourceRows
-      .filter((r) => !processedIds.has(r.id))
-      .slice(0, BATCH_SIZE);
+    const now = new Date();
+    const toGeocode: SourceRow[] = [];
 
-    if (toGeocode.length === 0) {
-      console.log("   Новых/изменённых адресов нет");
-      return;
+    for (const row of sourceRows) {
+      const existing = existingMap.get(row.id);
+      // Нет записи → геокодируем
+      if (!existing) {
+        toGeocode.push(row);
+        if (toGeocode.length >= BATCH_SIZE) break;
+        continue;
+      }
+      // Если координаты уже есть → пропускаем
+      if (existing.coordinates !== null && existing.coordinates !== undefined) {
+        continue;
+      }
+      // Координат нет, проверяем дату последней попытки
+      const lastRequest = existing.last_geocode_request;
+      if (!lastRequest) {
+        // Никогда не запрашивали → нужно
+        toGeocode.push(row);
+      } else {
+        const daysSince = (now.getTime() - new Date(lastRequest).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince >= RETRY_AFTER_DAYS) {
+          toGeocode.push(row);
+        }
+      }
+      if (toGeocode.length >= BATCH_SIZE) break;
     }
 
-    console.log(`   Найдено ${toGeocode.length} адресов для геокодирования`);
+    // (Опционально) выводим статистику для отладки
+    const totalPending = sourceRows.filter(row => {
+      const ex = existingMap.get(row.id);
+      if (!ex) return true;
+      if (ex.coordinates) return false;
+      if (!ex.last_geocode_request) return true;
+      const days = (now.getTime() - new Date(ex.last_geocode_request).getTime()) / (1000*3600*24);
+      return days >= RETRY_AFTER_DAYS;
+    }).length;
+    console.log(`   Всего адресов, требующих геокодирования (в т.ч. повтор через ${RETRY_AFTER_DAYS} дн): ${totalPending}`);
+
+    if (toGeocode.length === 0) {
+      console.log("   Новых/ожидающих повторной попытки адресов нет");
+      return;
+    }
+    await writeLog(logFileName, `Батч содержит ${toGeocode.length} адресов`); 
+    console.log(`   Запланировано на этот запуск: ${toGeocode.length} адресов`);
 
     let success = 0;
 
     for (let i = 0; i < toGeocode.length; i++) {
-      const { id, address, serialNumber, meterModel, usdName, usdType } =
-        toGeocode[i];
+      const { id, address, serialNumber, meterModel, usdName, usdType } = toGeocode[i];
 
       // ── Шаг 6: Геокодируем адрес ──────────────────────────────────────────
       const coords = await geocode(address);
 
       if (coords) {
+        await writeLog(logFileName, 
+        `✓ ID=${id} | Адрес: "${address}" | Координаты: ${coords.latitude}, ${coords.longitude} | Серийный номер: ${serialNumber}`
+    );
         // ── Шаг 7а: Координаты найдены — сохраняем в COORDS DB ───────────────
         const coordsJson = JSON.stringify({
           lat: coords.latitude,
@@ -193,6 +242,9 @@ async function processNewAddresses(): Promise<void> {
         );
         success++;
       } else {
+        await writeLog(logFileName, 
+       `✗ ID=${id} | Адрес: "${address}" | Не удалось загеокодировать | Серийный номер: ${serialNumber}`
+    );
         // ── Шаг 7б: Не нашли — сохраняем без координат чтобы не повторять ────
         await coordsPool.query(
           `INSERT INTO "Main".location (source_id, address, serial_number, meter_model, usd_name, usd_type, last_geocode_request)
@@ -208,11 +260,14 @@ async function processNewAddresses(): Promise<void> {
         await delay(DELAY_MS);
       }
     }
-
+      await writeLog(logFileName, 
+      `=== Завершено: успешно ${success}/${toGeocode.length}, пропущено ${toGeocode.length - success} ===`
+    );
     console.log(`   ✅ Геокодировано: ${success}/${toGeocode.length}`);
   } catch (error) {
     const err = error as Error;
     console.error("   ❌ Ошибка:", err.message);
+    await writeLog(logFileName, `!!! Ошибка выполнения: ${err.message}`);
   }
 }
 
@@ -220,10 +275,10 @@ async function processNewAddresses(): Promise<void> {
  * Запуск планировщика
  * По умолчанию: каждые 30 минут
  */
-export function startScheduler(cronExpression: string = "*0 3 * * 0"): void {
+export function startScheduler(cronExpression: string = DEFAULT_CRON): void {
   console.log("📅 Планировщик геокодирования запущен");
   console.log(`   Расписание: ${cronExpression}`);
-
+  console.log(`   Повтор неудачных адресов: каждые ${RETRY_AFTER_DAYS} дней`);
   // Запускаем сразу при старте
   processNewAddresses();
 
