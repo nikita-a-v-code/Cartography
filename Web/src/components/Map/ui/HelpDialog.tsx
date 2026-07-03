@@ -22,7 +22,8 @@ interface ConfigData {
   enableReadings: boolean;
   geocoder: {
     cron: string;
-    batchSize: number;
+    batchSizeShedule: number;
+    batchSizeHandle: number;
     retryDays: number;
   };
   readings: {
@@ -75,11 +76,17 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
               🗺️ Основные возможности
             </Typography>
             <Typography paragraph>
-              • <strong>Фильтрация точек</strong> – по населённым пунктам, типу УСПД, модели счётчика и статусу показаний.<br />
-              • <strong>Ручное добавление УСПД</strong> – нажмите «Добавить УСПД», затем кликните на карту.<br />
-              • <strong>Обновление показаний</strong> – кнопка в панели инструментов запускает синхронизацию с БД.<br />
-              • <strong>Кластеры</strong> – точки группируются при отдалении, у крупных кластеров отображается название населённого пункта.<br />
-              • <strong>Маркеры</strong>: зелёные (актуальные показания), красные (устаревшие), серые (нет показаний).
+              • <strong>Фильтрация точек</strong> – по населённым пунктам, типу
+              УСПД, модели счётчика и статусу показаний.
+              <br />• <strong>Ручное добавление УСПД</strong> – нажмите
+              «Добавить УСПД», затем кликните на карту.
+              <br />• <strong>Обновление показаний</strong> – кнопка в панели
+              инструментов запускает синхронизацию с БД.
+              <br />• <strong>Кластеры</strong> – точки группируются при
+              отдалении, у крупных кластеров отображается название населённого
+              пункта.
+              <br />• <strong>Маркеры</strong>: зелёные (актуальные показания),
+              красные (устаревшие), серые (нет показаний).
             </Typography>
 
             <Typography variant="h6" gutterBottom>
@@ -88,42 +95,79 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ open, onClose }) => {
             <Table size="small" sx={{ mb: 2 }}>
               <TableBody>
                 <TableRow>
-                  <TableCell component="th" scope="row">Порт сервера</TableCell>
+                  <TableCell component="th" scope="row">
+                    Порт сервера
+                  </TableCell>
                   <TableCell>{config.port}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Геокодер (включён)</TableCell>
-                  <TableCell>{config.enableGeocoder ? "✅ Да" : "❌ Нет"}</TableCell>
+                  <TableCell component="th" scope="row">
+                    Геокодер (включён)
+                  </TableCell>
+                  <TableCell>
+                    {config.enableGeocoder ? "✅ Да" : "❌ Нет"}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Расписание геокодера</TableCell>
-                  <TableCell><code>{config.geocoder.cron}</code> (каждые 3 дня в 03:00)</TableCell>
+                  <TableCell component="th" scope="row">
+                    Расписание геокодера
+                  </TableCell>
+                  <TableCell>
+                    <code>{config.geocoder.cron}</code> (каждые 3 дня в 03:00)
+                  </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Батч геокодера</TableCell>
-                  <TableCell>{config.geocoder.batchSize} адресов за запуск</TableCell>
+                  <TableCell component="th" scope="row">
+                    Батч геокодера по раписанию
+                  </TableCell>
+                  <TableCell>
+                    {config.geocoder.batchSizeShedule} адресов за запуск
+                  </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Повтор неудачных адресов</TableCell>
+                  <TableCell component="th" scope="row">
+                    Повтор неудачных адресов
+                  </TableCell>
                   <TableCell>каждые {config.geocoder.retryDays} дней</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Планировщик показаний (включён)</TableCell>
-                  <TableCell>{config.enableReadings ? "✅ Да" : "❌ Нет"}</TableCell>
+                  <TableCell component="th" scope="row">
+                    Батч ручного геокодирования
+                  </TableCell>
+                  <TableCell>
+                    {config.geocoder.batchSizeHandle} адресов за запуск
+                  </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Расписание чтения показаний</TableCell>
-                  <TableCell><code>{config.readings.cron}</code> (каждые 3 дня в 02:00)</TableCell>
+                  <TableCell component="th" scope="row">
+                    Планировщик показаний (включён)
+                  </TableCell>
+                  <TableCell>
+                    {config.enableReadings ? "✅ Да" : "❌ Нет"}
+                  </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell component="th" scope="row">Батч чтения показаний</TableCell>
-                  <TableCell>{config.readings.batchSize} записей за SQL-запрос</TableCell>
+                  <TableCell component="th" scope="row">
+                    Расписание чтения показаний
+                  </TableCell>
+                  <TableCell>
+                    <code>{config.readings.cron}</code> (каждые 3 дня в 02:00)
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell component="th" scope="row">
+                    Батч чтения показаний
+                  </TableCell>
+                  <TableCell>
+                    {config.readings.batchSize} записей за SQL-запрос
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
 
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              💡 Примечание: настройки хранятся в файле <code>.env</code> на сервере. Для изменения параметров обратитесь к администратору.
+              💡 Примечание: настройки хранятся в файле <code>.env</code> на
+              сервере. Для изменения параметров обратитесь к администратору.
             </Typography>
           </>
         )}

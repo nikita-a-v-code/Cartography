@@ -1,0 +1,134 @@
+node:internal/modules/esm/get_format:219
+  throw new ERR_UNKNOWN_FILE_EXTENSION(ext, filepath);
+        ^
+
+TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts" for C:\Programmirovanie\Cartography\Server\src\index.ts
+    at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:219:9)
+    at defaultGetFormat (node:internal/modules/esm/get_format:245:36)
+    at defaultLoad (node:internal/modules/esm/load:120:22)
+    at async ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:514:32)
+    at async ModuleJob._link (node:internal/modules/esm/module_job:115:19) {
+  code: 'ERR_UNKNOWN_FILE_EXTENSION'
+}
+
+Node.js v22.14.0
+node:internal/modules/cjs/loader:1228
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Programmirovanie\Cartography\Server\src\node_modules\.bin\ts-node'
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1225:15)
+    at Function._load (node:internal/modules/cjs/loader:1055:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:220:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:170:5)
+    at node:internal/main/run_main_module:36:49 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v22.14.0
+📅 Планировщик геокодирования запущен
+   Расписание: 0 3 */3 * *
+   Повтор неудачных адресов: каждые 30 дней
+📅 Планировщик показаний запущен
+   Расписание: 0 2 */3 * *
+[2026-07-01T08:56:02.979Z] 📊 Обновление показаний счётчиков...
+🚀 Сервер запущен на http://localhost:18545
+[2026-07-01T08:56:02.996Z] 🔄 Проверка новых адресов...
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+   Всего адресов, требующих геокодирования (в т.ч. повтор через 30 дн): 0
+   Новых/ожидающих повторной попытки адресов нет
+   ✅ Обновлено: 11173/11173, с показаниями: 9404
+GET /
+GET /static/js/main.0ca37b81.js
+GET /static/css/main.2084e1f1.css
+GET /planet.png
+Login attempt: { login: 'enforce_dba', password: '***' }
+Query result: User found
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+GET /
+GET /static/js/main.0ca37b81.js
+GET /static/css/main.2084e1f1.css
+GET /planet.png
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+GET /
+GET /static/js/main.0ca37b81.js
+GET /static/css/main.2084e1f1.css
+GET /planet.png
+Login attempt: { login: 'enforce_dba', password: '***' }
+Query result: User found
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+GET /api/admin/settings
+✅ Подключение к COORDS DB (координаты) установлено
+GET /api/admin/settings
+GET /api/admin/settings
+GET /api/admin/settings
+GET /api/admin/settings
+GET /api/admin/settings
+GET /api/admin/settings
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+GET /api/admin/settings
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+GET /api/admin/settings
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+GET /api/admin/settings
+GET /api/admin/settings
+GET /api/admin/settings
+GET /static/js/main.0ca37b81.js
+GET /static/css/main.2084e1f1.css
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+[2026-07-02T23:00:03.812Z] 📊 Обновление показаний счётчиков...
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+   ✅ Обновлено: 11173/11173, с показаниями: 9410
+[2026-07-03T00:00:02.652Z] 🔄 Проверка новых адресов...
+✅ Подключение к SOURCE DB (исходные данные) установлено
+✅ Подключение к COORDS DB (координаты) установлено
+   🗑️  Удалено удалённых счётчиков: 1
+   Всего адресов, требующих геокодирования (в т.ч. повтор через 30 дн): 0
+   Новых/ожидающих повторной попытки адресов нет

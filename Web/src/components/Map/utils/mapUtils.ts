@@ -7,9 +7,12 @@
 import L from "leaflet";
 import { PointData, ReadingStatus } from "../types";
 
-/** Базовый URL бэкенд-сервера */
+/** Базовый URL бэкенд-сервера.
+ * В dev-режиме (npm start) берётся из REACT_APP_API_URL.
+ * В production-сборке, когда сервер сам раздаёт фронт, используется
+ * пустая строка — запросы идут на тот же origin. */
 export const API_BASE =
-  process.env.REACT_APP_API_URL || "http://localhost:6002";
+  process.env.REACT_APP_API_URL || "";
 
 /** Координаты центра карты при первоначальной загрузке (г. Киров) */
 export const DEFAULT_CENTER: L.LatLngExpression = [58.6036, 49.6681];

@@ -12,7 +12,13 @@
 import { Router, Request, Response } from "express";
 import { coordsPool, sourcePool } from "../../config/database";
 // Функции и типы для работы с геокодером
-import { geocodeAddresses, geocodeProgress } from "../../scripts/geocode";
+import {
+  geocodeAddresses,
+  geocodeProgress,
+  pauseGeocoding,
+  resumeGeocoding,
+  cancelGeocoding,
+} from "../../scripts/geocode";
 const router = Router();
 
 /** Результат SQL-выражения COUNT(*) — PostgreSQL всегда возвращает строку, нужен parseInt */
@@ -25,7 +31,9 @@ router.get("/stats", async (_req: Request, res: Response) => {
     // Считаем все адреса в SOURCE DB, которые вообще имеют смысл геокодировать
     const total = await sourcePool.query<CountRow>(`
       SELECT COUNT(*) as count FROM "enforce_dba".schet_fr 
-      WHERE object_location IS NOT NULL AND object_location != ''
+      WHERE object_location IS NOT NULL 
+      AND object_location != ''
+      AND device_id ~ '^[0-9]+$'
     `);
 
     // Считаем, сколько записей в COORDS DB уже имеют координаты (coordinates != NULL)
@@ -96,6 +104,33 @@ router.get("/progress", (_req: Request, res: Response) => {
   _req.on("close", () => {
     geocodeProgress.off("progress", onProgress);
   });
+});
+
+/**
+ * POST /api/geocode/pause
+ * Приостановить геокодирование
+ */
+router.post("/pause", (_req: Request, res: Response) => {
+  pauseGeocoding();
+  res.json({ status: "paused" });
+});
+
+/**
+ * POST /api/geocode/resume
+ * Возобновить геокодирование
+ */
+router.post("/resume", (_req: Request, res: Response) => {
+  resumeGeocoding();
+  res.json({ status: "resumed" });
+});
+
+/**
+ * POST /api/geocode/cancel
+ * Отменить геокодирование
+ */
+router.post("/cancel", (_req: Request, res: Response) => {
+  cancelGeocoding();
+  res.json({ status: "cancelled" });
 });
 
 export default router;

@@ -17,9 +17,9 @@ import cron from "node-cron";
 import { sourcePool, coordsPool } from "../config/database";
 import { EventEmitter } from "events";
 import { writeLog, getReadingsLogFileName } from "../utils/logger";
+import { getSettings } from "./configService";
 
-// Настройки из переменных окружения (с дефолтами)
-const BATCH_SIZE = parseInt(process.env.READINGS_BATCH_SIZE || "1000", 10);
+// Расписание по умолчанию (из .env) используется только при первом старте
 const READINGS_CRON = process.env.READINGS_CRON || "0 2 */3 * *";
 
 // Глобальный EventEmitter — через него функция updateReadings() отправляет
@@ -51,6 +51,14 @@ let isPaused = false;
 let shouldCancel = false;
 
 async function updateReadings(): Promise<void> {
+  // Читаем актуальные настройки из БД (кеш 30 сек)
+  const settings = await getSettings();
+  if (!settings.enableReadings) {
+    console.log(`[${new Date().toISOString()}] ⏸️ Планировщик показаний отключён в настройках, пропускаем`);
+    return;
+  }
+  const BATCH_SIZE = settings.readingsBatchSize;
+
   if (isRunning) {
     // Защита от одновременного запуска двух синхронизаций (например, по расписанию + вручную)
     console.log("   ⏳ Обновление показаний уже выполняется, пропускаем");

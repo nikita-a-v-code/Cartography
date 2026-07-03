@@ -4,7 +4,7 @@ import React from "react";
 import { ThemeProvider, createTheme, CssBaseline, CircularProgress, Box } from "@mui/material";
 import { AppBar } from "@mui/material";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import MapComponent from "./components/Map/Map";
+import MainLayout from "./components/MainLayout";
 import Login from "./page/Login/Login"
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import "./App.css"
@@ -62,7 +62,7 @@ const AppContent: React.FC = () => {
   return (
     <Box className="app">
       <Box component="main" className="app-main">
-        <MapComponent />
+        <MainLayout />
       </Box>
     </Box>
   );

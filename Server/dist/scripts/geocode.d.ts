@@ -15,5 +15,11 @@
 import { EventEmitter } from "events";
 export declare const geocodeProgress: EventEmitter<[never]>;
 declare function geocodeAddresses(): Promise<void>;
+/** Пауза выполнения геокодирования */
+export declare function pauseGeocoding(): void;
+/** Возобновление выполнения геокодирования */
+export declare function resumeGeocoding(): void;
+/** Отмена выполнения геокодирования */
+export declare function cancelGeocoding(): void;
 export { geocodeAddresses };
 //# sourceMappingURL=geocode.d.ts.map

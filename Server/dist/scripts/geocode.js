@@ -18,12 +18,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.geocodeProgress = void 0;
+exports.pauseGeocoding = pauseGeocoding;
+exports.resumeGeocoding = resumeGeocoding;
+exports.cancelGeocoding = cancelGeocoding;
 exports.geocodeAddresses = geocodeAddresses;
 const database_1 = require("../config/database");
 const geocoder_1 = require("../services/geocoder");
 const addressNormalizer_1 = require("../services/addressNormalizer");
 const dotenv_1 = __importDefault(require("dotenv"));
 const events_1 = require("events");
+// Настройки из переменных окружения (с дефолтами)
+const BATCH_SIZE = parseInt(process.env.GEOCODING_BATCH_SIZE || "5000", 10);
 dotenv_1.default.config();
 // Задержка между HTTP-запросами к геокодеру (мс).
 // Nominatim (OpenStreetMap) требует минимум 1000 мс между запросами по Terms of Use.
@@ -31,12 +36,14 @@ dotenv_1.default.config();
 const DELAY_MS = 1100;
 // Сколько записей обрабатывать за один запуск скрипта.
 // Ограничение нужно, чтобы скрипт не висел часами (при 5000 адресов ≈ 1.5 часа).
-const BATCH_SIZE = 5000;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Глобальный EventEmitter — через него функция geocodeAddresses() отправляет
 // события прогресса SSE-событиям слушающим в index.ts (/api/readings/progress)
 exports.geocodeProgress = new events_1.EventEmitter();
 let isRunning = false;
+// Флаги для контроля выполнения
+let isPaused = false;
+let shouldCancel = false;
 async function geocodeAddresses() {
     if (isRunning) {
         console.log("Геокодирование уже выполняется, пропускаем");
@@ -82,7 +89,7 @@ async function geocodeAddresses() {
       LEFT JOIN "enforce_dba".bp_usd bu ON bsu.id_usd = bu.id
       LEFT JOIN "enforce_dba".bp_usd_type but ON bu.id_type = but.id
       WHERE sf.device_id IS NOT NULL
-        AND sf.device_id != ''
+        AND sf.device_id ~ '^[0-9]+$'
         AND sf.object_location IS NOT NULL
       ORDER BY sf.id
     `);
@@ -152,6 +159,24 @@ async function geocodeAddresses() {
             failed: 0,
         });
         for (let i = 0; i < addresses.length; i++) {
+            // Проверяем флаги отмены и паузы
+            if (shouldCancel) {
+                console.log("\n   ⏹️ Геокодирование отменено пользователем");
+                exports.geocodeProgress.emit("progress", {
+                    status: "done",
+                    processed,
+                    total,
+                    success,
+                    failed,
+                    message: "Отменено",
+                });
+                return;
+            }
+            // Пауза — ждём возобновления
+            while (isPaused) {
+                console.log("   ⏸️ Геокодирование на паузе");
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
             // Деструктуризируем и выводим отдельные переменные
             const { id, address, serialNumber, meterModel, usdName, usdType } = addresses[i];
             // Обрезаем длинный адрес в выводе для читаемости
@@ -285,5 +310,26 @@ async function geocodeAddresses() {
             message: err.message,
         });
     }
+    finally {
+        isRunning = false;
+        isPaused = false;
+        shouldCancel = false;
+    }
+}
+/** Пауза выполнения геокодирования */
+function pauseGeocoding() {
+    isPaused = true;
+    console.log("⏸️ Геокодирование приостановлено");
+}
+/** Возобновление выполнения геокодирования */
+function resumeGeocoding() {
+    isPaused = false;
+    console.log("▶️ Геокодирование возобновлено");
+}
+/** Отмена выполнения геокодирования */
+function cancelGeocoding() {
+    shouldCancel = true;
+    isPaused = false;
+    console.log("⏹️ Геокодирование отменено");
 }
 //# sourceMappingURL=geocode.js.map

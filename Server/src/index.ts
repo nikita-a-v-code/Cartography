@@ -31,6 +31,7 @@ import referenceRouter from "./routes/reference/reference";
 import localitiesRouter from "./routes/localities/localities";
 import pointsRouter from "./routes/points/points";
 import readingsRouter from "./routes/reader/reader";
+import adminRouter from "./routes/admin/admin";
 
 import { startReadingsScheduler } from "./services/readingsScheduler";
 import { startScheduler } from "./services/geocodeScheduler";
@@ -70,6 +71,7 @@ app.use("/api/geocode", geocodeRouter);
 app.use("/api/uspd-types", uspdTypesRouter);
 app.use("/api/uspd-points", uspdPointsRouter);
 app.use("/api/config", referenceRouter);
+app.use("/api/admin", adminRouter);
 app.use("/api/localities", localitiesRouter);
 app.use("/api/points", pointsRouter);
 app.use("/api/readings", readingsRouter);
@@ -93,6 +95,10 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, "../../Web/build")));
 app.get("*", (req, res) => {
+  // API-маршруты не должны попадать в SPA catch-all
+  if (req.path.startsWith("/api/")) {
+    return res.status(404).json({ error: `API route not found: ${req.path}` });
+  }
   res.sendFile(path.join(__dirname, "../../Web/build", "index.html"));
 });
 

@@ -16,6 +16,7 @@
 import { sourcePool, coordsPool } from "../config/database";
 import { geocode } from "../services/geocoder";
 import { normalizeAddress } from "../services/addressNormalizer";
+import { getSettings } from "../services/configService";
 import dotenv from "dotenv";
 import { EventEmitter } from "events";
 
@@ -28,7 +29,6 @@ const DELAY_MS = 1100;
 
 // Сколько записей обрабатывать за один запуск скрипта.
 // Ограничение нужно, чтобы скрипт не висел часами (при 5000 адресов ≈ 1.5 часа).
-const BATCH_SIZE = 5000;
 
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -56,6 +56,10 @@ export const geocodeProgress = new EventEmitter();
 
 let isRunning = false;
 
+// Флаги для контроля выполнения
+let isPaused = false;
+let shouldCancel = false;
+
 async function geocodeAddresses(): Promise<void> {
   if (isRunning) {
     console.log("Геокодирование уже выполняется, пропускаем");
@@ -71,6 +75,10 @@ async function geocodeAddresses(): Promise<void> {
   }
 
   isRunning = true;
+
+  // Читаем актуальные настройки из БД
+  const settings = await getSettings();
+  const BATCH_SIZE = settings.geocodingBatchSize;
 
   console.log("🚀 Запуск геокодирования адресов...\n");
   console.log("📖 SOURCE DB: исходные данные (enforce_dba.schet_fr)");
@@ -107,7 +115,7 @@ async function geocodeAddresses(): Promise<void> {
       LEFT JOIN "enforce_dba".bp_usd bu ON bsu.id_usd = bu.id
       LEFT JOIN "enforce_dba".bp_usd_type but ON bu.id_type = but.id
       WHERE sf.device_id IS NOT NULL
-        AND sf.device_id != ''
+        AND sf.device_id ~ '^[0-9]+$'
         AND sf.object_location IS NOT NULL
       ORDER BY sf.id
     `);
@@ -195,6 +203,26 @@ async function geocodeAddresses(): Promise<void> {
     });
 
     for (let i = 0; i < addresses.length; i++) {
+      // Проверяем флаги отмены и паузы
+      if (shouldCancel) {
+        console.log("\n   ⏹️ Геокодирование отменено пользователем");
+        geocodeProgress.emit("progress", {
+          status: "done",
+          processed,
+          total,
+          success,
+          failed,
+          message: "Отменено",
+        });
+        return;
+      }
+
+      // Пауза — ждём возобновления
+      while (isPaused) {
+        console.log("   ⏸️ Геокодирование на паузе");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
       // Деструктуризируем и выводим отдельные переменные
       const { id, address, serialNumber, meterModel, usdName, usdType } =
         addresses[i];
@@ -346,7 +374,30 @@ async function geocodeAddresses(): Promise<void> {
       failed: 0,
       message: err.message,
     });
+  } finally {
+    isRunning = false;
+    isPaused = false;
+    shouldCancel = false;
   }
+}
+
+/** Пауза выполнения геокодирования */
+export function pauseGeocoding(): void {
+  isPaused = true;
+  console.log("⏸️ Геокодирование приостановлено");
+}
+
+/** Возобновление выполнения геокодирования */
+export function resumeGeocoding(): void {
+  isPaused = false;
+  console.log("▶️ Геокодирование возобновлено");
+}
+
+/** Отмена выполнения геокодирования */
+export function cancelGeocoding(): void {
+  shouldCancel = true;
+  isPaused = false;
+  console.log("⏹️ Геокодирование отменено");
 }
 
 export { geocodeAddresses };

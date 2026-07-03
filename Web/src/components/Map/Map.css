@@ -7,6 +7,31 @@
   flex-direction: column;
 }
 
+/* ===== Заглушка раздела ===== */
+.section-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  color: #9e9e9e;
+}
+.section-placeholder h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  color: #616161;
+}
+.section-placeholder p {
+  font-size: 0.9rem;
+  margin: 0;
+}
+.section-placeholder-icon {
+  font-size: 64px;
+  line-height: 1;
+}
+
 .map-container {
   position: relative;
   flex: 1;

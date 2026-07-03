@@ -15,18 +15,23 @@ import {
   UspdType,
 } from "./types";
 import { API_BASE, extractLocality, getReadingStatus } from "./utils/mapUtils";
-import Toolbar, { ActivePanel } from "./ui/Toolbar";
+import Toolbar, { ActivePanel } from "../common/Toolbar/Toolbar";
+
 import FilterDropdown from "./utils/FilterDropdown";
 import StatusIndicators from "./ui/StatusIndicators";
 import MapView from "./ui/MapView";
 import ReadingsPanel from "./ui/ReadingsPanel";
 import UspdDialog from "./ui/UspdDialog";
 import UspdTypesDialog from "./ui/UspdTypesDialog";
-import HelpDialog from "./ui/HelpDialog";
+
 import { useAuth } from "../../context/AuthContext";
 import GeocodingPanel from "./ui/GeocodingPanel";
 
-const MapComponent: React.FC = () => {
+interface MapComponentProps {
+  onToggleSidebar: () => void;
+}
+
+const MapComponent: React.FC<MapComponentProps> = ({ onToggleSidebar }) => {
   // --- Состояние населённых пунктов и поиска ---
   // Список всех н.п. из справочника API
   const [localities, setLocalities] = useState<LocalityData[]>([]);
@@ -93,8 +98,6 @@ const MapComponent: React.FC = () => {
   >(null);
   // Диалог управления типами УСПД
   const [typesDialogOpen, setTypesDialogOpen] = useState(false);
-
-  const [helpOpen, setHelpOpen] = useState(false);
 
   const { isAdmin, isOperator } = useAuth();
   const canUpdateReadings = isAdmin() || isOperator();
@@ -507,7 +510,7 @@ const MapComponent: React.FC = () => {
         onStartReadingsUpdate={startReadingsUpdate}
         onStartGeocode={startGeocode}
         onToggleAddUspdMode={() => setAddingUspdMode((v) => !v)}
-        onOpenHelp={() => setHelpOpen(true)}
+        onToggleSidebar={onToggleSidebar}
         canUpdateReadings={canUpdateReadings}
         canAdminAccess={canAdminAccess}
       />
@@ -623,7 +626,7 @@ const MapComponent: React.FC = () => {
         }
         onClose={() => setTypesDialogOpen(false)}
       />
-      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+
     </div>
   );
 };

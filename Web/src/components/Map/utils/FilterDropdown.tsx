@@ -21,7 +21,7 @@ import LocalityFilter from "../filters/LocalityFilter";
 import UspdFilter from "../filters/UspdFilter";
 import MeterFilter from "../filters/MeterFilter";
 import StatusFilter from "../filters/StatusFilter";
-import { ActivePanel } from "../ui/Toolbar";
+import { ActivePanel } from "../../common/Toolbar/Toolbar";
 import { ReadingStatus } from "../types";
 
 interface FilterItem {

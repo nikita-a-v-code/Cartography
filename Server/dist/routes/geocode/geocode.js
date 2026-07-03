@@ -20,7 +20,9 @@ router.get("/stats", async (_req, res) => {
         // Считаем все адреса в SOURCE DB, которые вообще имеют смысл геокодировать
         const total = await database_1.sourcePool.query(`
       SELECT COUNT(*) as count FROM "enforce_dba".schet_fr 
-      WHERE object_location IS NOT NULL AND object_location != ''
+      WHERE object_location IS NOT NULL 
+      AND object_location != ''
+      AND device_id ~ '^[0-9]+$'
     `);
         // Считаем, сколько записей в COORDS DB уже имеют координаты (coordinates != NULL)
         const geocoded = await database_1.coordsPool.query(`
@@ -83,6 +85,30 @@ router.get("/progress", (_req, res) => {
     _req.on("close", () => {
         geocode_1.geocodeProgress.off("progress", onProgress);
     });
+});
+/**
+ * POST /api/geocode/pause
+ * Приостановить геокодирование
+ */
+router.post("/pause", (_req, res) => {
+    (0, geocode_1.pauseGeocoding)();
+    res.json({ status: "paused" });
+});
+/**
+ * POST /api/geocode/resume
+ * Возобновить геокодирование
+ */
+router.post("/resume", (_req, res) => {
+    (0, geocode_1.resumeGeocoding)();
+    res.json({ status: "resumed" });
+});
+/**
+ * POST /api/geocode/cancel
+ * Отменить геокодирование
+ */
+router.post("/cancel", (_req, res) => {
+    (0, geocode_1.cancelGeocoding)();
+    res.json({ status: "cancelled" });
 });
 exports.default = router;
 //# sourceMappingURL=geocode.js.map

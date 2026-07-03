@@ -23,8 +23,14 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import AddLocationAltIcon from "@mui/icons-material/AddLocationAlt";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import { StatsData, ReadingsProgress, GeocodingProgress } from "../types";
-import UserMenu from "./UserMenu";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import MenuIcon from "@mui/icons-material/Menu";
+import {
+  StatsData,
+  ReadingsProgress,
+  GeocodingProgress,
+} from "../../Map/types";
+import UserMenu from "../../Map/ui/UserMenu";
 
 export type ActivePanel = "locality" | "uspd" | "meter" | "status" | null;
 
@@ -49,7 +55,7 @@ interface ToolbarProps {
   onStartReadingsUpdate: () => void;
   onStartGeocode: () => void;
   onToggleAddUspdMode: () => void;
-  onOpenHelp: () => void;
+  onToggleSidebar: () => void;
   canUpdateReadings: boolean;
   canAdminAccess: boolean;
 }
@@ -75,12 +81,20 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onStartReadingsUpdate,
   onStartGeocode,
   onToggleAddUspdMode,
-  onOpenHelp,
+  onToggleSidebar,
   canUpdateReadings,
   canAdminAccess,
 }) => (
   <Box className="top-toolbar">
     <Box className="toolbar-left">
+      <IconButton
+        onClick={onToggleSidebar}
+        size="small"
+        sx={{ mr: 0.5 }}
+        title="Навигация"
+      >
+        <MenuIcon />
+      </IconButton>
       <Box className="toolbar-brand">
         <MapIcon sx={{ fontSize: 24, color: "#1976d2" }} />
         <Typography variant="h6" fontWeight={700} color="primary">
@@ -241,15 +255,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </Box>
         )}
       </Typography>
-      {canUpdateReadings && (
-        <Tooltip title={geocodingProgress?.status === "running" ? "Дождитесь завершения геокодирования" : "Обновить показания"}>
+      {canAdminAccess && (
+        <Tooltip
+          title={
+            geocodingProgress?.status === "running"
+              ? "Дождитесь завершения геокодирования"
+              : "Обновить показания"
+          }
+        >
           <span>
             <Button
               variant="outlined"
               size="small"
               startIcon={<RefreshIcon />}
               onClick={onStartReadingsUpdate}
-              disabled={readingsProgress?.status === "running" || geocodingProgress?.status === "running"}
+              disabled={
+                readingsProgress?.status === "running" ||
+                geocodingProgress?.status === "running"
+              }
               sx={{ textTransform: "none" }}
             >
               Обновить статус показаний
@@ -259,14 +282,23 @@ const Toolbar: React.FC<ToolbarProps> = ({
       )}
 
       {canAdminAccess && (
-        <Tooltip title={readingsProgress?.status === "running" ? "Дождитесь завершения обновления показаний" : "Запустить геокодирование"}>
+        <Tooltip
+          title={
+            readingsProgress?.status === "running"
+              ? "Дождитесь завершения обновления показаний"
+              : "Запустить геокодирование"
+          }
+        >
           <span>
             <Button
               variant="outlined"
               size="small"
               startIcon={<RefreshIcon />}
               onClick={onStartGeocode}
-              disabled={geocodingProgress?.status === "running" || readingsProgress?.status === "running"}
+              disabled={
+                geocodingProgress?.status === "running" ||
+                readingsProgress?.status === "running"
+              }
               sx={{ textTransform: "none" }}
             >
               Запустить геокодирование
@@ -277,13 +309,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-      {canAdminAccess && (
-        <Tooltip title="Справка">
-          <IconButton onClick={onOpenHelp} size="small">
-            <HelpOutlineIcon />
-          </IconButton>
-        </Tooltip>
-      )}
 
       <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 

@@ -1,21 +1,28 @@
 import { Router, Request, Response } from "express";
+import { getSettings } from "../../services/configService";
 
 const router = Router();
-router.get("/", (_req: Request, res: Response) => {
-  res.json({
-    port: process.env.PORT || "3000",
-    enableGeocoder: process.env.ENABLE_GEOCODER === "true",
-    enableReadings: process.env.ENABLE_READINGS === "true",
-    geocoder: {
-      cron: process.env.GEOCODER_CRON || "0 3 */3 * *",
-      batchSize: parseInt(process.env.GEOCODER_BATCH_SIZE || "300", 10),
-      retryDays: parseInt(process.env.GEOCODER_RETRY_DAYS || "30", 10),
-    },
-    readings: {
-      cron: process.env.READINGS_CRON || "0 2 */3 * *",
-      batchSize: parseInt(process.env.READINGS_BATCH_SIZE || "1000", 10),
-    },
-  });
+router.get("/", async (_req: Request, res: Response) => {
+  try {
+    const s = await getSettings();
+    res.json({
+      port: process.env.PORT || "3000",
+      enableGeocoder: s.enableGeocoder,
+      enableReadings: s.enableReadings,
+      geocoder: {
+        cron: s.geocoderCron,
+        batchSizeShedule: s.geocoderBatchSize,
+        batchSizeHandle: s.geocodingBatchSize,
+        retryDays: s.geocoderRetryDays,
+      },
+      readings: {
+        cron: s.readingsCron,
+        batchSize: s.readingsBatchSize,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 export default router;

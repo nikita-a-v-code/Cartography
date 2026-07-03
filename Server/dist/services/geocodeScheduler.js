@@ -40,6 +40,7 @@ async function processNewAddresses() {
     console.log(`[${new Date().toISOString()}] 🔄 Проверка новых адресов...`);
     try {
         // ── Шаг 1: Загружаем все адреса из SOURCE DB ──────────────────────────
+        // Для геокодирования — только счётчики с цифровым device_id
         const sourceResult = await database_1.sourcePool.query(`
       SELECT sf.id, sf.object_location as address, sf.device_id as "serialNumber",
              bt.idname as "meterModel",
@@ -51,7 +52,7 @@ async function processNewAddresses() {
       LEFT JOIN "enforce_dba".bp_usd bu ON bsu.id_usd = bu.id
       LEFT JOIN "enforce_dba".bp_usd_type but ON bu.id_type = but.id
       WHERE sf.device_id IS NOT NULL
-        AND sf.device_id != ''
+        AND sf.device_id ~ '^[0-9]+$'
         AND sf.object_location IS NOT NULL
       ORDER BY sf.id
     `);
@@ -61,10 +62,13 @@ async function processNewAddresses() {
             console.log("   Источник данных пуст, пропускаем");
             return;
         }
-        // ── Шаг 2: Удаляем записи счётчиков, удалённых из SOURCE DB ──────────
-        // Сначала readings (FK), потом location
-        await database_1.coordsPool.query(`DELETE FROM "Main".readings WHERE source_id != ALL($1::integer[])`, [sourceIds]);
-        const deletedResult = await database_1.coordsPool.query(`DELETE FROM "Main".location WHERE source_id != ALL($1::integer[]) RETURNING source_id`, [sourceIds]);
+        // ── Шаг 2: Удаляем записи счётчиков, физически удалённых из SOURCE DB ──
+        // Берём ВСЕ id из источника (без фильтра по device_id), чтобы не удалять
+        // счётчики с нецифровым device_id — они просто не геокодируются, но остаются.
+        const allSourceIdsResult = await database_1.sourcePool.query(`SELECT id FROM "enforce_dba".schet_fr`);
+        const allSourceIds = allSourceIdsResult.rows.map((r) => r.id);
+        await database_1.coordsPool.query(`DELETE FROM "Main".readings WHERE source_id != ALL($1::integer[])`, [allSourceIds]);
+        const deletedResult = await database_1.coordsPool.query(`DELETE FROM "Main".location WHERE source_id != ALL($1::integer[]) RETURNING source_id`, [allSourceIds]);
         if ((deletedResult.rowCount ?? 0) > 0) {
             console.log(`   🗑️  Удалено удалённых счётчиков: ${deletedResult.rowCount}`);
         }
@@ -140,7 +144,8 @@ async function processNewAddresses() {
                 toGeocode.push(row);
             }
             else {
-                const daysSince = (now.getTime() - new Date(lastRequest).getTime()) / (1000 * 60 * 60 * 24);
+                const daysSince = (now.getTime() - new Date(lastRequest).getTime()) /
+                    (1000 * 60 * 60 * 24);
                 if (daysSince >= RETRY_AFTER_DAYS) {
                     toGeocode.push(row);
                 }
@@ -149,7 +154,7 @@ async function processNewAddresses() {
                 break;
         }
         // (Опционально) выводим статистику для отладки
-        const totalPending = sourceRows.filter(row => {
+        const totalPending = sourceRows.filter((row) => {
             const ex = existingMap.get(row.id);
             if (!ex)
                 return true;
@@ -157,7 +162,8 @@ async function processNewAddresses() {
                 return false;
             if (!ex.last_geocode_request)
                 return true;
-            const days = (now.getTime() - new Date(ex.last_geocode_request).getTime()) / (1000 * 3600 * 24);
+            const days = (now.getTime() - new Date(ex.last_geocode_request).getTime()) /
+                (1000 * 3600 * 24);
             return days >= RETRY_AFTER_DAYS;
         }).length;
         console.log(`   Всего адресов, требующих геокодирования (в т.ч. повтор через ${RETRY_AFTER_DAYS} дн): ${totalPending}`);
